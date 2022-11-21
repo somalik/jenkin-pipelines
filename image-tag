@@ -1,0 +1,32 @@
+pipeline {
+    agent any
+    environment {
+      GIT_HASH = getgithash()
+      GIT_TAG = getgitversion()
+      Docker_Tag = "$GIT_TAG-$BUILD_NUMBER-$GIT_HASH"
+      }
+    stages{
+
+    stage("Git Checkout"){
+        steps{
+            git branch: 'stg', credentialsId: 'gitlab', url: 'http://gitlab.aksa.com:8929/sohail/zong-1.git'
+             }
+                         }
+        stage("Build Image"){
+        steps{
+            sh 'pwd'
+            sh 'docker build -t new-nginx:$Docker_Tag .'
+         //   sh 'docker build -t new-nginx:$GIT_TAG-$BUILD_NUMBER-$GIT_HASH .'
+             }
+                            }
+          }
+         }
+    
+   def getgithash(){
+    def githash = sh lable: '', returnStdout: true, script: 'git rev-parse --short HEAD'
+    return githash.trim()
+}
+    def getgitversion(){
+    def gitversion = sh lable: '', returnStdout: true, script: 'git tag --points-at HEAD'
+    return gitversion.trim()
+}
