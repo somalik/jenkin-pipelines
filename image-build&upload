@@ -1,0 +1,32 @@
+pipeline {
+    agent any
+    environment {
+      registry1 = "10.0.0.4/serviceone"
+      registry2 = "10.0.0.4/servicetwo"
+      registry3 = "10.0.0.4/servicethree"
+
+  }
+
+    stages{
+    stage("Git Checkout"){
+        steps{
+            git branch: 'main', credentialsId: 'testdeocred', url: 'http://gitlab.aksa.com:8929/zahid/testdemo.git'
+            }
+        }
+    stage("Build Image for Service One"){
+        steps{
+            sh 'docker build -t $registry1:v1 -f sone .'
+            }
+        }
+    stage("Build Image Service Two"){
+        steps{
+            sh 'docker build -t $registry2:v1 -f stwo .'
+            }
+        }
+    stage("Build Image Service three"){
+        steps{
+            sh 'docker build -t $registry3:v1 -f sthree .'
+            }
+        }
+      }
+    }
