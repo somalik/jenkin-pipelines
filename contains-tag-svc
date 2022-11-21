@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-      tag_name = '$tag_name'
+      tag_name = '$tag_name'  //DEP_MAIN_SVC1-V1+SVC2-V1+SVC3-V1
       registry1 = "10.0.0.4/serviceone"
       registry2 = "10.0.0.4/servicetwo"
       registry3 = "10.0.0.4/servicethree"
