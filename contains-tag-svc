@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+    environment {
+      tag_name = '$tag_name'
+      registry1 = "10.0.0.4/serviceone"
+      registry2 = "10.0.0.4/servicetwo"
+      registry3 = "10.0.0.4/servicethree"
+    //  registryCredential = 'dockerhub'
+     // dockerImage = ''
+  }
+
+    stages{
+    stage("Git Checkout"){
+        steps{
+            git branch: 'main', credentialsId: 'testdeocred', url: 'http://gitlab.aksa.com:8929/zahid/testdemo.git'
+            }
+        }
+    stage('Run Required Scripts') {
+        steps {
+           script {
+                tag_name = sh (
+                script: 'git describe --tags `git rev-list --tags --max-count=1`',
+                returnStdout: true
+                ).trim()
+    echo "Git tag is : ${tag_name}"
+}
+            }
+       }
+    stage("Build Image for Service One"){
+        steps{
+            script {
+                if (tag_name.contains('SVC6')) {
+                   sh 'docker build -t $registry1:v1 -f sone .'
+                }  
+                else {
+                echo "donot deploy ${tag_name}"
+                }
+              }
+            }
+        }
+        
+     stage('Build Image Service Two') {
+        steps {
+            script {
+                if (tag_name.contains('SVC2')) {
+                sh 'docker build -t $registry2:v1 -f stwo .'
+                }  
+                else {
+                echo "donot deploy ${tag_name}"
+                }
+              }
+            }
+        }
+        
+     stage('Build Image Service Three') {
+        steps {
+            script {
+                if (tag_name.contains('SVC7')) {
+                sh 'docker build -t $registry3:v1 -f sthree .'
+                }  
+                else {
+                echo "donot deploy $tag_name"
+                }
+              }
+            }
+        }
+        
+      }
+    }
