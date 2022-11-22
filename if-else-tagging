@@ -1,8 +1,8 @@
 pipeline {
     agent any
     environment {
-   def SVC1=false,SVC2=false,SVC3=false
-def SVC1Version='V0',SVC2Version='V0',SVC3Version='V0'
+      def SVC1=false,SVC2=false,SVC3=false
+      def SVC1Version='V0',SVC2Version='V0',SVC3Version='V0'
       registry1 = "10.0.0.4/serviceone"
       registry2 = "10.0.0.4/servicetwo"
       registry3 = "10.0.0.4/servicethree"
@@ -26,12 +26,11 @@ def SVC1Version='V0',SVC2Version='V0',SVC3Version='V0'
                 ).trim()
 def serviceHashmap = [SVC1:false,SVC2:false,SVC3:false]
 def versionHashmap = [SVC1_Version:"V0",SVC2_Version:"V0",SVC3_Version:"V0"]
-tag1 = 'DEP_MAIN_SVC1-V1+SVC2-V1+SVC3-V1';
-def array = tag1.split('_')
-//def array = tag_name.split('_')
+//tag1 = 'DEP_MAIN_SVC1-V1+SVC2-V1+SVC3-V1';
+//def array = tag1.split('_')
+def array = tag_name.split('_')
 def serviceNeedToDeploy=array[2].split('\\+')
-//def SVC1=false,SVC2=false,SVC3=false
-//def SVC1_Version='V0',SVC2_Version='V0',SVC3_Version='V0'
+
 
 for(service in serviceNeedToDeploy){
     sArray=service.split('-');
@@ -58,18 +57,12 @@ println("SVC3= "+SVC3+" Version = "+SVC3Version)
             }
        } 
 
-      stage("Build Image forvice One"){
-        steps{
-            echo 'nothing to deploy in '+ SVC1Version
-        }
-           
-       }
-       
+
     stage("Build Image for Service One"){
         steps{
             script {
             if (SVC1 == true) {
-            
+            echo 'Making image for SVC1'
             sh 'docker build -t $registry1:'+ SVC1Version+' -f sone .'
             } else {
             sh echo 'nothing to deploy in SVC1'
@@ -81,7 +74,7 @@ println("SVC3= "+SVC3+" Version = "+SVC3Version)
         steps{
             script {
             if (SVC2 == true) {
-//            sh 'pwd && ls'
+            echo 'Making image for SVC2'
             sh 'docker build -t $registry2:'+ SVC2Version+' -f stwo .'
             } else {
             sh echo 'nothing to deploy in SVC2'
@@ -93,7 +86,7 @@ println("SVC3= "+SVC3+" Version = "+SVC3Version)
         steps{
             script {
             if (SVC3 == true) {
-            sh 'pwd && ls'
+            echo 'Making image for SVC3'
             sh 'docker build -t $registry3:'+ SVC3Version+' -f sthree .'
            } else {
             sh echo 'nothing to deploy in SVC3'
