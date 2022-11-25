@@ -1,0 +1,132 @@
+pipeline {
+    agent any
+    environment {
+      def SVC1=false,SVC2=false,SVC3=false
+      def SVC1Version='V0',SVC2Version='V0',SVC3Version='V0'
+      image_tag_name = "10.0.0.4:8085"
+      repo_name = "zong-01"
+      GIT_HASH = getgithash()
+    //  registryCredential = 'dockerhub'
+     // dockerImage = ''
+  }
+
+    stages{
+    stage("Git Checkout"){
+        steps{
+            git branch: 'main', credentialsId: 'testdeocred', url: 'http://gitlab.aksa.com:8929/zahid/testdemo.git'
+            }
+        }
+        
+    stage('Run Required Scripts') {
+        steps {
+           script {
+                tag_name = sh (
+                script: 'git describe --tags `git rev-list --tags --max-count=1`',
+                returnStdout: true
+                ).trim()
+   def serviceHashmap = [SVC1:false,SVC2:false,SVC3:false]
+   def versionHashmap = [SVC1_Version:"V0",SVC2_Version:"V0",SVC3_Version:"V0"]
+//tag1 = 'DEP_MAIN_SVC1-V1+SVC2-V1+SVC3-V1';
+//def array = tag1.split('_')
+    def array = tag_name.split('_')
+    def serviceNeedToDeploy=array[2].split('\\+')
+
+
+    for(service in serviceNeedToDeploy){
+    sArray=service.split('-');
+    if (sArray[0] == "SVC1") {SVC1=true
+    SVC1Version = sArray[1]    
+    }else if (sArray[0] == "SVC2") {SVC2=true
+    SVC2Version = sArray[1]    
+    }else if (sArray[0] == "SVC3") {SVC3=true
+    SVC3Version = sArray[1]    
+    }
+    serviceHashmap["${sArray[0]}"]=true
+    versionHashmap["${sArray[0]}_Version"]=sArray[1]
+}
+
+echo "Git tag is : ${tag_name}"
+}
+            }
+       } 
+
+
+    stage("Build Image for Service One"){
+        steps{
+            script {
+            if (SVC1 == true) {
+                withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh ''' 
+                   
+                   docker build -t $image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+GIT_HASH+''' -f sone .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+GIT_HASH+'''
+                   docker rmi $image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+GIT_HASH+'''
+                   
+                   echo "$image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+GIT_HASH+''' is built and uploaded to Nexus Repo"
+                   '''
+                }
+            } 
+            else {
+            sh echo 'nothing to deploy in SVC1'
+            }
+          }
+        }
+     }
+    stage("Build Image Service Two"){
+        steps{
+            script {
+            if (SVC2 == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh ''' 
+                   
+                   docker build -t $image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+GIT_HASH+''' -f sone .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+GIT_HASH+'''
+                   docker rmi $image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+GIT_HASH+'''
+                   
+                   echo "$image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+GIT_HASH+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }  
+            } 
+            else {
+            sh echo 'nothing to deploy in SVC2'
+                }
+             }
+        }
+    }    
+    stage("Build Image Service three"){
+        steps{
+            script {
+            if (SVC3 == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh ''' 
+                   
+                   docker build -t $image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+GIT_HASH+''' -f sone .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+GIT_HASH+'''
+                   docker rmi $image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+GIT_HASH+'''
+                   
+                   echo "$image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+GIT_HASH+''' is built and uploaded to Nexus Repo"
+                   '''
+                   } 
+           } 
+           else {
+            sh echo 'nothing to deploy in SVC3'
+          }
+        }
+      }
+    }    
+  }
+      post {
+        always {
+              emailext to: 'somalik@msn.com', subject: 'Test', body: '<br>Project: $JOB_NAME <br>Build Number: $BUILD_NUMBER <br>URL of bulid: $BUILD_URL' 
+              }
+    }
+}
+
+   def getgithash(){
+    def githash = sh lable: '', returnStdout: true, script: 'git rev-parse --short HEAD'
+    return githash.trim()
+}
+
