@@ -1,0 +1,160 @@
+pipeline {
+    agent any
+    environment {
+      def SVC1=false,SVC2=false,SVC3=false
+      def SVC1Version='V0',SVC2Version='V0',SVC3Version='V0'
+      image_tag_name = "10.0.0.4:8085"
+      repo_name = "zong-01"
+      def GIT_HASH = ""
+      Doc_tag = "$BUILD_NUMBER-$GIT_HASH"
+      EMAIL_TO ="somalik@msn.com"
+      }
+
+    stages{
+    stage("Git Checkout"){
+        steps{
+            git branch: 'STG', credentialsId: 'testdeocred', url: 'http://gitlab.aksa.com:8929/zahid/testdemo.git'
+             script {
+                    if (! env.GIT_HASH) {
+                       GIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                       Doc_tag = "$BUILD_NUMBER-$GIT_HASH"
+                    }
+                    echo "** Git Hash is : ${GIT_HASH} **"
+                }
+            }
+        }
+        
+    stage('TAG and Version Scripts') {
+        steps {
+           script {
+                tag_name = sh (
+                script: 'git describe --tags --abbrev=0',
+                returnStdout: true
+                ).trim()
+                
+                def serviceHashmap = [SVC1:false,SVC2:false,SVC3:false]
+                def versionHashmap = [SVC1_Version:"V0",SVC2_Version:"V0",SVC3_Version:"V0"]
+//tag_name = 'DEP_MAIN_SVC1-V1+SVC2-V1+SVC3-V1';
+
+                def array = tag_name.split('_')
+                def serviceNeedToDeploy=array[2].split('\\+')
+
+
+for(service in serviceNeedToDeploy){
+    sArray=service.split('-');
+    if (sArray[0] == "SVC1") {SVC1=true
+    SVC1Version = sArray[1]    
+    }else if (sArray[0] == "SVC2") {SVC2=true
+    SVC2Version = sArray[1]    
+    }else if (sArray[0] == "SVC3") {SVC3=true
+    SVC3Version = sArray[1]    
+    }
+    serviceHashmap["${sArray[0]}"]=true
+    versionHashmap["${sArray[0]}_Version"]=sArray[1]
+}
+
+echo "Git tag is : ${tag_name}"
+             }
+          }
+       } 
+
+
+    stage("Build Image for Service One"){
+        steps{
+            script {
+            if (SVC1 == true) {
+                withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh ''' 
+                   
+                   docker build -t $image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+Doc_tag+''' -f sone .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+Doc_tag+'''
+                   
+                   echo "$image_tag_name/$repo_name/svc1:'''+SVC1Version+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                }
+            } else {
+            sh 'echo nothing to deploy in SVC1'
+            }
+          }
+        }
+     }
+    stage("Build Image Service Two"){
+        steps{
+            script {
+            if (SVC2 == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh ''' 
+                   
+                   docker build -t $image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+Doc_tag+''' -f stwo .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+Doc_tag+'''
+                   
+                   echo "$image_tag_name/$repo_name/svc2:'''+SVC1Version+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }  
+            } else {
+            sh 'echo nothing to deploy in SVC2'
+                }
+             }
+        }
+    }    
+    stage("Build Image Service three"){
+        steps{
+            script {
+            if (SVC3 == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh ''' 
+                   
+                   docker build -t $image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+Doc_tag+''' -f sthree .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+Doc_tag+'''
+                   
+                   echo "$image_tag_name/$repo_name/svc3:'''+SVC1Version+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   } 
+           } else {
+            sh 'echo nothing to deploy in SVC3'
+          }
+        }
+      }
+    } 
+        stage('Email Approval') {
+        steps {
+
+            script {
+             def mailRecipients = 'somalik@msn.com'
+             def jobName = currentBuild.fullDisplayName
+
+                   emailext body: '<br>"Started By:  <br>Please go to console output of ${BUILD_URL} + input to approve or Reject.)',
+                   mimeType: 'text/html',
+                   subject: "Job '${JOB_BASE_NAME}' (${BUILD_NUMBER}) is waiting for Approval",
+                   to: "${mailRecipients}",
+                   replyTo: "${mailRecipients}",
+                   recipientProviders: [[$class: 'CulpritsRecipientProvider']]
+             def userInput = input(id: 'userInput', message: 'Job A Failed do you want to build Job B?', ok: 'Yes')
+            }
+        }
+    }    
+
+}
+  post {
+     //   always {
+    //          emailext to: 'somalik@msn.com', subject: 'Project: $JOB_NAME Build Number: $BUILD_NUMBER', body: '<br>URL of bulid: $BUILD_URL' 
+   //           }
+        success {
+            emailext body: '<br>Project: $JOB_NAME <br>Build Number: $BUILD_NUMBER <br>URL of bulid: $BUILD_URL <br>Following images has been build and Pushed on $Docker_Registry <br>1: $image_tag_name$repo_namesvc1:v1 <br>2: $image_tag_name/$repo_name/svc2:v1 <br>3: $image_tag_name/$repo_name/svc3:v1 <br>  <br>  <br> <br>Build approved by ${BUILD_USER} ', 
+                     to: "${EMAIL_TO}", 
+                     subject: 'Success : $PROJECT_NAME - #$BUILD_NUMBER'
+        }
+        
+        failure {
+            emailext body: 'Check console output at $BUILD_URL to view the results. \n\n ${CHANGES} {BUILD_LOG, maxLines=100, escapeHtml=false}', 
+                     to: "${EMAIL_TO}", 
+                     subject: 'Failed: $PROJECT_NAME - #$BUILD_NUMBER'
+        } 
+    }
+}
