@@ -1,0 +1,225 @@
+pipeline {
+    agent {
+        docker {
+        image 'mcr.microsoft.com/dotnet/sdk:6-ssh'
+        args '-u root:root'
+        }
+    }
+    environment {
+      def SVC1=false,SVC2=false,SVC3=false
+      def SVC1Version='V0',SVC2Version='V0',SVC3Version='V0'
+      def GIT_HASH = ""
+      Doc_tag = "$BUILD_NUMBER-$GIT_HASH"
+      EMAIL_TO ="somalik@msn.com"
+      }
+    stages{
+      stage("Git Checkout"){
+        steps{
+            git branch: 'STG', credentialsId: 'testdeocred', url: 'http://gitlab.aksa.com:8929/zahid/testdemo.git'
+        script {
+                    if (! env.GIT_HASH) {
+                       GIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                       Doc_tag = "$BUILD_NUMBER-$GIT_HASH"
+                    }
+                    echo "** Git Hash is : ${GIT_HASH} **"
+                }
+            }
+        }
+            
+    stage('TAG and Version Scripts') {
+        steps {
+           script {
+                tag_name = sh (
+                script: 'git describe --tags --abbrev=0',
+                returnStdout: true
+                ).trim()
+                
+                def serviceHashmap = [SVC1:false,SVC2:false,SVC3:false]
+                def versionHashmap = [SVC1_Version:"V0",SVC2_Version:"V0",SVC3_Version:"V0"]
+//tag_name = 'DEP_MAIN_SVC1-V2+SVC3-V2';
+                def array = tag_name.split('_')
+                def serviceNeedToDeploy=array[2].split('\\+')
+
+
+for(service in serviceNeedToDeploy){
+    sArray=service.split('-');
+    if (sArray[0] == "SVC1") {SVC1=true
+    SVC1Version = sArray[1]    
+    }else if (sArray[0] == "SVC2") {SVC2=true
+    SVC2Version = sArray[1]    
+    }else if (sArray[0] == "SVC3") {SVC3=true
+    SVC3Version = sArray[1]    
+    }
+    serviceHashmap["${sArray[0]}"]=true
+    versionHashmap["${sArray[0]}_Version"]=sArray[1]
+}
+
+echo "Git tag is : ${tag_name}"
+}
+            }
+       } 
+
+    stage('Restore packages'){
+        steps{
+             script {
+            if (SVC1 == true) {
+            sh "dotnet restore ServiceOne/ServiceOne.csproj"
+            }
+            if (SVC2 == true) {
+            sh "dotnet restore ServiceTwo/ServiceTwo.csproj"
+            }
+            if (SVC3 == true) {
+            sh "dotnet restore ServiceThree/ServiceThree.csproj"
+             }else {
+            sh 'echo nothing to restore'
+                }
+             }
+            }
+        }
+    stage('remove old builds'){
+        steps{
+
+            sh 'rm -rf publish'
+            sh 'sleep 5'
+
+           }
+        }
+    stage("Build Service One"){
+        steps{
+            script {
+            if (SVC1 == true) {
+                sh '''
+                mkdir -p publish/ServiceOne && chmod 777 -R publish/ServiceOne
+                dotnet publish ServiceOne/ServiceOne.csproj -o publish/ServiceOne/
+                zip -r -j publish/ServiceOne-'''+SVC1Version+'-'+Doc_tag+'''.zip publish/ServiceOne/*
+                '''
+            } else {
+            sh 'echo nothing to deploy in SVC1'
+            }
+          }
+        }
+     }
+    stage("Build Service Two"){
+        steps{
+            script {
+            if (SVC2 == true) {
+                  sh '''
+                  mkdir -p publish/ServiceTwo && chmod 777 -R publish/ServiceTwo
+                  dotnet publish ServiceTwo/ServiceTwo.csproj -o publish/ServiceTwo/
+                  zip -r -j publish/ServiceTwo-'''+SVC2Version+'-'+Doc_tag+'''.zip publish/ServiceTwo/*
+                  '''
+            } else {
+            sh 'echo nothing to deploy in SVC2'
+                }
+             }
+        }
+    }
+    stage("Build Image Service three"){
+        steps{
+            script {
+            if (SVC3 == true) {
+                  sh '''
+                  mkdir -p publish/ServiceThree && chmod 777 -R publish/ServiceThree
+                  dotnet publish ServiceThree/ServiceThree.csproj -o publish/ServiceThree/
+                  zip -r -j publish/ServiceThree-'''+SVC3Version+'-'+Doc_tag+'''.zip publish/ServiceThree/*
+                  '''
+           } else {
+            sh 'echo nothing to deploy in SVC3'
+          }
+        }
+      }
+    }
+    stage("build deploy-dev"){
+         steps{
+            dir('/var/lib/jenkins/workspace/docagent/publish') {
+                script{
+               sshPublisher(
+                   continueOnError: false, failOnError: true,
+                     publishers: [
+                        sshPublisherDesc(
+                            configName: 'dev6', 
+                            transfers: [
+                            sshTransfer(cleanRemote: true,
+                            excludes: '',
+                           // execCommand: 'pwd',
+                            execTimeout: 120000,
+                            flatten: false,
+                            makeEmptyDirs: false,
+                            noDefaultExcludes: false,
+                            patternSeparator: '[, ]+',
+                            remoteDirectory: '/data/application/',
+                            remoteDirectorySDF: false,
+                            removePrefix: '',
+                            sourceFiles: '*.zip')],
+                        //    sourceFiles: '*')],
+                            usePromotionTimestamp: false,
+                            useWorkspaceInPromotion: false,
+                            verbose: true)]) 
+}
+        }
+          }
+                 } 
+        stage("remove old app"){
+          steps{
+              script{
+            withCredentials([usernamePassword(credentialsId: 'server', passwordVariable: 'deploypass', usernameVariable: 'deployuser')]) {   
+          if (SVC1 == true) {
+          sh 'sshpass -p "$deploypass" ssh -o StrictHostKeyChecking=no admin@10.0.0.6 -- rm -rf /data/application/ServiceOne && sleep 2'
+            
+          }
+                    if (SVC2 == true) {
+          sh 'sshpass -p "$deploypass" ssh -o StrictHostKeyChecking=no admin@10.0.0.6 -- rm -rf /data/application/ServiceTwo && sleep 2'
+            
+          }
+                    if (SVC3 == true) {
+          sh 'sshpass -p "$deploypass" ssh -o StrictHostKeyChecking=no admin@10.0.0.6 -- rm -rf /data/application/ServiceThree && sleep 2'
+            
+          }else {
+            sh 'echo nothing to deploy in remove'
+            }
+          }
+         }
+       }
+    }
+    stage("deploy build"){
+      steps{
+        script{
+            withCredentials([usernamePassword(credentialsId: 'server', passwordVariable: 'deploypass', usernameVariable: 'deployuser')]) {   
+           if (SVC1 == true) {
+          sh 'sshpass -p "$deploypass" ssh admin@10.0.0.6 -- unzip -o /home/admin/data/application/ServiceOne*.zip -d /data/application/ServiceOne'
+           }
+                    if (SVC2 == true) {
+          sh 'sshpass -p "$deploypass" ssh admin@10.0.0.6 -- unzip -o /home/admin/data/application/ServiceTwo*.zip -d /data/application/ServiceTwo'
+           }
+                      if (SVC3 == true) {
+          sh 'sshpass -p "$deploypass" ssh admin@10.0.0.6 -- unzip -o /home/admin/data/application/ServiceThree*.zip -d /data/application/ServiceThree'
+           }else {
+            sh 'echo nothing to deploy '
+            }
+          
+            }
+             }
+        }
+    } 
+        stage("restart service"){
+      steps{
+        script{
+            withCredentials([usernamePassword(credentialsId: 'server', passwordVariable: 'deploypass', usernameVariable: 'deployuser')]) {   
+           if (SVC1 == true) {
+          sh 'sshpass -p "$deploypass" ssh admin@10.0.0.6 -- sudo systemctl restart serviceone'
+           }
+                    if (SVC2 == true) {
+          sh 'sshpass -p "$deploypass" ssh admin@10.0.0.6 -- sudo systemctl restart servicetwo'
+           }
+                      if (SVC3 == true) {
+          sh 'sshpass -p "$deploypass" ssh admin@10.0.0.6 -- sudo systemctl restart servicethree'
+           }else {
+            sh 'echo nothing to restart '
+            }
+          
+            }
+             }
+        }
+    }
+  }
+}
