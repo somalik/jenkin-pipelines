@@ -1,0 +1,435 @@
+pipeline {
+    agent any
+    environment {
+      def SUMS=false,SPMT=false,SCSH=false,SFT=false,MUMS=false,MPMT=false,MCSH=false,MFT=false
+      def SUMSVersion='V0',SPMTVersion='V0',SCSHVersion='V0',SFTVersion='V0',MUMSVersion='V0',MPMTVersion='V0',MCSHVersion='V0',MFTVersion='V0'
+      image_tag_name = "10.0.0.4:8085"
+      repo_name = "zong-01"
+      def GIT_HASH = ""
+      Doc_tag = "$BUILD_NUMBER-$GIT_HASH"
+      EMAIL_TO ="somalik@msn.com"
+      }
+
+    stages{
+    stage("Git Checkout"){
+        steps{
+      //    git branch: 'DEV', credentialsId: 'testdeocred', url: 'http://10.0.0.4:8929/zahid/zong-aksa-staging.git'
+            checkout scm
+             script {
+                    if (! env.GIT_HASH) {
+                       GIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                       Doc_tag = "$BUILD_NUMBER-$GIT_HASH"
+                    }
+                    echo "** Git Hash is : ${GIT_HASH} **"
+                }
+            }
+        }
+
+    stage('TAG and Version Scripts') {
+        steps {
+           script {
+                tag_name = sh (
+                script: 'git describe --tags --abbrev=0',
+                returnStdout: true
+                ).trim()
+
+                def serviceHashmap = [SUMS:false,SPMT:false,SCSH:false,SFT:false,MUMS:false,MPMT:false,MCSH:false,MFT:false]
+                def versionHashmap = [SUMS_Version:"V0",SPMT_Version:"V0",SCSH_Version:"V0",SFT_Version:"V0",MUMS_Version:"V0",MPMT_Version:"V0",MCSH_Version:"V0",MFT_Version:"V0"]
+//tag_name = 'DEP_MAIN_SUMS-V1+SPMT-V1+SCSH-V1+SFT-v1';
+
+                def array = tag_name.split('_')
+                def serviceNeedToDeploy=array[2].split('\\+')
+
+
+for(service in serviceNeedToDeploy){
+    sArray=service.split('-');
+    if (sArray[0] == "SUMS") {SUMS=true
+    SUMSVersion = sArray[1]
+    }else if (sArray[0] == "SPMT") {SPMT=true
+    SPMTVersion = sArray[1]
+    }else if (sArray[0] == "SCSH") {SCSH=true
+    SCSHVersion = sArray[1]
+    }else if (sArray[0] == "SFT") {SFT=true
+    SFTVersion = sArray[1]
+    }else if (sArray[0] == "MUMS") {MUMS=true
+    MUMSVersion = sArray[1]
+    }else if (sArray[0] == "MPMT") {MPMT=true
+    MPMTVersion = sArray[1]
+    }else if (sArray[0] == "MCSH") {MCSH=true
+    MCSHVersion = sArray[1]
+    }else if (sArray[0] == "MFT") {MFT=true
+    MFTVersion = sArray[1]
+    }
+    serviceHashmap["${sArray[0]}"]=true
+    versionHashmap["${sArray[0]}_Version"]=sArray[1]
+}
+
+echo "Git tag is : ${tag_name}"
+             }
+          }
+       }
+
+
+    stage("Build Image for Subscriber User Management Service"){
+        steps{
+            script {
+            if (SUMS == true) {
+                withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/sums:'''+SUMSVersion+'-'+Doc_tag+''' -f sums .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/sums:'''+SUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/sums:'''+SUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+SUMSVersion+'-'+Doc_tag+'''/g"  subscriberusermanagmentservice.yml >>subscriberusermanagementservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/sums:'''+SUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                }
+            } else {
+            sh 'echo nothing to deploy in SUMS'
+            }
+          }
+        }
+     }
+    stage("Build Image Subcriber Payment Service"){
+        steps{
+            script {
+            if (SPMT == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/spmt:'''+SUMSVersion+'-'+Doc_tag+''' -f spmt .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/spmt:'''+SUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/spmt:'''+SUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+SUMSVersion+'-'+Doc_tag+'''/g"  subscriberpmtservice.yml >>subscriberpmtservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/spmt:'''+SUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }
+            } else {
+            sh 'echo nothing to deploy in SPMT'
+                }
+             }
+        }
+    }
+    stage("Build Image Subscriber Cash Managment"){
+        steps{
+            script {
+            if (SCSH == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/scsh:'''+SUMSVersion+'-'+Doc_tag+''' -f scsh .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/scsh:'''+SUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/scsh:'''+SUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+SUMSVersion+'-'+Doc_tag+'''/g"  subscribercshservice.yml >>subscribercshservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/scsh:'''+SUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }
+           } else {
+            sh 'echo nothing to deploy in SCSH'
+          }
+        }
+      }
+    }
+    stage("Build Image Subscriber Funds Transfer"){
+        steps{
+            script {
+            if (SFT == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/sft:'''+SUMSVersion+'-'+Doc_tag+''' -f sft .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/sft:'''+SUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/sft:'''+SUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+SUMSVersion+'-'+Doc_tag+'''/g"  subscriberftservice.yml >>subscriberftservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/sft:'''+SUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }
+           } else {
+            sh 'echo nothing to deploy in SFT'
+          }
+        }
+      }
+    }
+    stage("Build Image for Merchant User Management Service"){
+        steps{
+            script {
+            if (MUMS == true) {
+                withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/mums:'''+MUMSVersion+'-'+Doc_tag+''' -f mums .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/mums:'''+MUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/mums:'''+MUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+MUMSVersion+'-'+Doc_tag+'''/g"  merchantusermanagmentservice.yml >>merchantusermanagementservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/mums:'''+MUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                }
+            } else {
+            sh 'echo nothing to deploy in MUMS'
+            }
+          }
+        }
+     }
+
+
+    stage("Build Image Merchant Payment Service"){
+        steps{
+            script {
+            if (MPMT == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/mpmt:'''+MUMSVersion+'-'+Doc_tag+''' -f mpmt .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/mpmt:'''+MUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/mpmt:'''+MUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+MUMSVersion+'-'+Doc_tag+'''/g"  merchantpmtservice.yml >>merchantpmtservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/mpmt:'''+MUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }
+            } else {
+            sh 'echo nothing to deploy in MPMT'
+                }
+             }
+        }
+    }
+    stage("Build Image merchant Cash Managment"){
+        steps{
+            script {
+            if (MCSH == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/mcsh:'''+MUMSVersion+'-'+Doc_tag+''' -f mcsh .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/mcsh:'''+MUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/mcsh:'''+MUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+MUMSVersion+'-'+Doc_tag+'''/g"  merchantcshservice.yml >>merchantcshservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/mcsh:'''+MUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }
+           } else {
+            sh 'echo nothing to deploy in MCSH'
+          }
+        }
+      }
+    }
+    stage("Build Image merchant Funds Transfer"){
+        steps{
+            script {
+            if (MFT == true) {
+                   withCredentials([string(credentialsId: 'docker-pass', variable: 'docpasswd')]) {
+                   sh '''
+
+                   docker build -t $image_tag_name/$repo_name/mft:'''+MUMSVersion+'-'+Doc_tag+''' -f mft .
+                   docker login -u somalik -p $docpasswd 10.0.0.4:8085
+                   docker push $image_tag_name/$repo_name/mft:'''+MUMSVersion+'-'+Doc_tag+'''
+                   docker rmi $image_tag_name/$repo_name/mft:'''+MUMSVersion+'-'+Doc_tag+'''
+                   sed "s/{{tag}}/'''+MUMSVersion+'-'+Doc_tag+'''/g"  merchantftservice.yml >>merchantftservice-tag.yml
+
+                   echo "$image_tag_name/$repo_name/mft:'''+MUMSVersion+'-'+Doc_tag+''' is built and uploaded to Nexus Repo"
+                   '''
+                   }
+           } else {
+            sh 'echo nothing to deploy in MFT'
+          }
+        }
+      }
+    }
+
+     stage('deploy Merchant User Management Service on K8') {
+        steps {
+            script {
+                if (MUMS == true) {
+                withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no merchantusermanagementservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f merchantusermanagementservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f merchantusermanagementservice-tag.yml'
+                    }
+                 }
+               }else {
+                    sh 'echo nothing to deploy pods for MUMS'
+                  }
+                }
+              }
+            }
+
+    stage('deploy merchantpmtservice on K8') {
+        steps {
+            script {
+                if (MPMT == true) {
+             withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no merchantpmtservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f merchantpmtservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f merchantpmtservice-tag.yml'
+                    }
+                 }
+               } else {
+            sh 'echo nothing to deploy pods for MPMT'
+          }
+        }
+      }
+    }
+         stage('deploy merchantcshservice on K8') {
+        steps {
+            script {
+                if (MCSH == true) {
+             withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no merchantcshservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f merchantcshservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f merchantcshservice-tag.yml'
+                    }
+                  }
+               }else {
+            sh 'echo nothing to deploy pods for MCSH'
+              }
+            }
+         }
+      }
+         stage('deploy merchantftservice on K8') {
+        steps {
+            script {
+                if (MCSH == true) {
+             withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no merchantftservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f merchantftservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f merchantftservice-tag.yml'
+                    }
+                  }
+               }else {
+            sh 'echo nothing to deploy pods for MCSH'
+              }
+            }
+         }
+      }
+     stage('deploy Subscriber User Management Service on K8') {
+        steps {
+            script {
+                if (SUMS == true) {
+                withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no subscriberusermanagementservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f subscriberusermanagementservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f subscriberusermanagementservice-tag.yml'
+                    }
+                 }
+               }else {
+                    sh 'echo nothing to deploy pods for SUMS'
+                  }
+                }
+              }
+            }
+
+    stage('deploy subscriberpmtservice on K8') {
+        steps {
+            script {
+                if (SPMT == true) {
+             withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no subscriberpmtservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f subscriberpmtservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f subscriberpmtservice-tag.yml'
+                    }
+                 }
+               } else {
+            sh 'echo nothing to deploy pods for SPMT'
+          }
+        }
+      }
+    }
+         stage('deploy subscribercshservice on K8') {
+        steps {
+            script {
+                if (SCSH == true) {
+             withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no subscribercshservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f subscribercshservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f subscribercshservice-tag.yml'
+                    }
+                  }
+               }else {
+            sh 'echo nothing to deploy pods for SCSH'
+              }
+            }
+         }
+      }
+         stage('deploy subscriberftservice on K8') {
+        steps {
+            script {
+                if (SCSH == true) {
+             withCredentials([usernamePassword(credentialsId: 'kubernetes1', passwordVariable: 'passwd', usernameVariable: 'user')]) {
+                sh 'sshpass -p "$passwd" scp -o StrictHostKeyChecking=no subscriberftservice-tag.yml admin@172.16.1.101:/home/admin/'
+
+                try{
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl apply -f subscriberftservice-tag.yml'
+                    }
+                    catch(error){
+                    sh 'sshpass -p "$passwd" ssh admin@172.16.1.101 kubectl create -f subscriberftservice-tag.yml'
+                    }
+                  }
+               }else {
+            sh 'echo nothing to deploy pods for SCSH'
+              }
+            }
+         }
+      }
+
+
+
+
+}
+       post {
+     //   always {
+    //          emailext to: 'somalik@msn.com', subject: 'Project: $JOB_NAME Build Number: $BUILD_NUMBER', body: '<br>URL of bulid: $BUILD_URL'
+   //           }
+        success {
+            emailext body: '<br>Project: $JOB_NAME <br>Build Number: $BUILD_NUMBER <br>URL of bulid: $BUILD_URL <br>Following images has been build and Pushed on $Docker_Registry <br>1: $image_tag_name$repo_nameSUMS:v1 <br>2: $image_tag_name/$repo_name/SPMT:v1 <br>3: $image_tag_name/$repo_name/SCSH:v1 <br>  <br>  <br> <br>Build approved by ${BUILD_USER} ',
+                     to: "${EMAIL_TO}",
+                     subject: 'Success : $PROJECT_NAME - #$BUILD_NUMBER'
+        }
+
+        failure {
+            emailext body: 'Check console output at $BUILD_URL to view the results. \n\n ${CHANGES} {BUILD_LOG, maxLines=100, escapeHtml=false}',
+                     to: "${EMAIL_TO}",
+                     subject: 'Failed: $PROJECT_NAME - #$BUILD_NUMBER'
+        }
+   }
+}
