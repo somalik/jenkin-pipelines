@@ -44,7 +44,7 @@ stage("build deploy-dev"){
                           s3Upload consoleLogLevel: 'INFO',
                           dontSetBuildResultOnFailure: false,
                           dontWaitForConcurrentBuildCompletion: false, 
-                          entries: [[bucket: 'zong-artifacts',
+                          entries: [[bucket: 'client-artifacts',
                                               excludedFile: '', 
                                               flatten: false, 
                                               gzipFiles: false, 
