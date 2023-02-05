@@ -1,5 +1,75 @@
 # jenkin-pipelines
-### get the Git committer email address
+### get the Git committer email address.
+################################
+# Remote Directory copy
+##################################
+stage("build deploy-dev"){
+         steps{
+            dir('/var/lib/jenkins/workspace/docagent/publish') {
+                script{
+               sshPublisher(
+                   continueOnError: false, failOnError: true,
+                     publishers: [
+                        sshPublisherDesc(
+                            configName: 'dev6', 
+                            transfers: [
+                            sshTransfer(cleanRemote: true,
+                            excludes: '',
+                           // execCommand: 'pwd',
+                            execTimeout: 120000,
+                            flatten: false,
+                            makeEmptyDirs: false,
+                            noDefaultExcludes: false,
+                            patternSeparator: '[, ]+',
+                            remoteDirectory: '/data/application/',
+                            remoteDirectorySDF: false,
+                            removePrefix: '',
+                            sourceFiles: '*.zip')],
+                        //    sourceFiles: '*')],
+                            usePromotionTimestamp: false,
+                            useWorkspaceInPromotion: false,
+                            verbose: true)]) 
+                        }
+                   }
+                }
+             } 
+ ###############################################
+ ####    AWS S3 UPload
+ ################################################
+ 
+            stage('upload to AWS S3'){
+            steps{
+                dir('/data/build'){
+                      script{
+                          s3Upload consoleLogLevel: 'INFO',
+                          dontSetBuildResultOnFailure: false,
+                          dontWaitForConcurrentBuildCompletion: false, 
+                          entries: [[bucket: 'zong-artifacts',
+                                              excludedFile: '', 
+                                              flatten: false, 
+                                              gzipFiles: false, 
+                                              keepForever: false, 
+                                              managedArtifacts: true,  
+                                              noUploadOnFailure: true,  
+                                              selectedRegion: 'ap-northeast-1',
+                                              showDirectlyInBrowser: true,
+                                              sourceFile: '*.zip', 
+                                              storageClass: 'STANDARD', 
+                                              uploadFromSlave: false, 
+                                              useServerSideEncryption: false]],
+                                              pluginFailureResultConstraint: 'FAILURE',
+                                              profileName: 'helloaws',
+                                              userMetadata: []
+                     }
+                }
+          }
+     }
+ ######################################################
+ ####################################################
+             
+
+
+
 _______________________________________
 
 
