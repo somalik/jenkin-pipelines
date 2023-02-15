@@ -26,13 +26,13 @@ sudo systemctl status jenkins
 #  Plugins Needed
 
 #### SSH
-Publish Over SSH	
-SSH Agent	
-SSH Pipeline Step
+Publish Over SSH ,	
+SSH Agent	,
+SSH Pipeline Step,
 
-GitLab
-Generic Webhook Trigger
+GitLab,
+Generic Webhook Trigger,
 
-Docker
-Docker Pipeline
-docker-build-step
+Docker,
+Docker Pipeline,
+docker-build-step,
