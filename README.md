@@ -33,9 +33,9 @@ stage("build deploy-dev"){
                    }
                 }
              } 
- ###############################################
+ ##########
  ####    AWS S3 UPload
- ################################################
+ #######
  
             stage('upload to AWS S3'){
             steps{
@@ -64,13 +64,12 @@ stage("build deploy-dev"){
                 }
           }
      }
- ######################################################
- ####################################################
+
              
 
 
 
-_______________________________________
+ ### get the Git committer user email address
 
 
 stage('Run Required Scripts') {
@@ -88,7 +87,6 @@ stage('Run Required Scripts') {
 
 
  ### get the Git commit TAG
-_______________________________________
 
      stage('Run Required Scripts') {
         steps {
@@ -102,8 +100,8 @@ _______________________________________
             }
        } 
  
- TAG NAME and Version Number Split and make variable and print
- ___________________________________________________________________________
+ ### TAG NAME and Version Number Split and make variable and print
+ 
  
 def serviceHashmap = [SVC1:false,SVC2:false,SVC3:false]
 def versionHashmap = [SVC1_Version:"V0",SVC2_Version:"V0",SVC3_Version:"V0"]
