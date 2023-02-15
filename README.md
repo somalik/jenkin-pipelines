@@ -21,3 +21,18 @@ sudo systemctl start jenkins
 
 
 sudo systemctl status jenkins
+
+
+#  Plugins Needed
+
+#### SSH
+Publish Over SSH	
+SSH Agent	
+SSH Pipeline Step
+
+GitLab
+Generic Webhook Trigger
+
+Docker
+Docker Pipeline
+docker-build-step
