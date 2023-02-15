@@ -33,6 +33,10 @@ SSH Pipeline Step,
 GitLab,
 Generic Webhook Trigger,
 
+Kubernetes
+Kubernetes CLI
+Kubernetes :: Pipeline :: DevOps Steps
+
 Docker,
 Docker Pipeline,
 docker-build-step,
