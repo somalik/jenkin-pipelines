@@ -1,8 +1,8 @@
 # jenkin-pipelines
-### get the Git committer email address.
-################################
-# Remote Directory copy
-##################################
+
+
+### Remote Directory copy
+
 stage("build deploy-dev"){
          steps{
             dir('/var/lib/jenkins/workspace/docagent/publish') {
@@ -33,9 +33,9 @@ stage("build deploy-dev"){
                    }
                 }
              } 
- ##########
- ####    AWS S3 UPload
- #######
+
+ ###    AWS S3 UPload
+
  
             stage('upload to AWS S3'){
             steps{
@@ -68,9 +68,9 @@ stage("build deploy-dev"){
              
 
 
-########
- ### get the Git committer user email address
-########
+
+ ### get the Git committer email address.
+
 
 stage('Run Required Scripts') {
         steps {
@@ -134,4 +134,3 @@ println("SVC2= "+SVC2+" Version = "+SVC2_Version)
 println("SVC3= "+SVC3+" Version = "+SVC3_Version)
 
 
-_______________________________________________________________________
