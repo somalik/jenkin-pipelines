@@ -1,0 +1,58 @@
+pipeline {
+    agent {
+        docker {
+        image 'mcr.microsoft.com/dotnet/sdk:7.0-scp'
+        args '-u root:root'
+        }
+    }
+
+    stages{
+
+      stage("Git Checkout"){
+        steps{
+           git branch: 'PipelineTest', credentialsId: 'TFS-IBVS', url: 'http://ak-tfs17-01.aksa.com.pk:8080/tfs/TFSCollection/PTML/_git/NewSimSale.API'
+             }
+        }
+   stage("New Sim"){
+
+        steps{
+           // withEnv(["DOTNET_CLI_TELEMETRY_OPTOUT=true"]) {
+            script {
+                sh '''
+                apt install zip -y
+                pwd
+                ls
+                dotnet restore NewSimSale.API.csproj --configfile ./NuGet.config
+                mkdir -p publish && chmod 777 -R publish
+                dotnet publish NewSimSale.API.csproj -c Release -r linux-x64 -o publish/NewSimSale.API/
+                
+                zip -r -j publish/NewSimSale.API-.zip publish/NewSimSale.API/*
+                sleep 5
+                '''
+            }
+          }
+     //   }
+                    post {
+                success {
+                    slackSend channel: '#test', message: " build  Successfull"
+                }
+                failure {
+                    slackSend channel: '#test', color: 'danger', message: "Publish stage failed with error: ${currentBuild.result}"
+                }
+            }
+     }   
+   }
+ }
+ #########################################################################
+ ################################################################################
+NuGet.config
+ <?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="local" value="http://10.0.0.4:8081/repository/IBVS-PTML/" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <disabledPackageSources />
+  <activePackageSource>
+    <add key="All" value="(Aggregate source)" />
+  </activePackageSource>
