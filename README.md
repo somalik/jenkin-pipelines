@@ -40,3 +40,22 @@ Kubernetes :: Pipeline :: DevOps Steps
 Docker,
 Docker Pipeline,
 docker-build-step,
+
+##########################################################################
+
+chk app health
+
+     stage('Post-Deployment Check') {
+            steps {
+                script {
+                    // Using a Groovy conditional to determine the next steps could be an approach
+                    def appHealthy = sh(script: 'curl -sf http://myapp.example.com/health', returnStatus: true) == 0
+                    if (appHealthy) {
+                        echo "Application is healthy. No restore needed."
+                    } else {
+                        echo "Application health check failed. Initiating restore..."
+                        sh './restore_from_backup.sh'
+                    }
+                }
+            }
+        }
