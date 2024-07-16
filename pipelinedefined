@@ -68,6 +68,23 @@ pipeline {
         }
 
 ####################################################################3
+Maven build Micro Integrator    //   to build car file with maven for MI WSO2 
 #####################################################################
 
-        
+         stage('Build WAR') {
+            steps {
+                script {
+                    sh '''
+                    cd Service_Product/
+                    mvn clean install -DskipTests
+                    '''
+                    sh '''
+                    cd Service_Product/Service_ProductCompositeExporter/target
+                    mv Service_ProductCompositeExporter_1.0.0-SNAPSHOT.car ${APP_NAME}-${BUILD_TAG}.car
+                    '''
+                }
+              }
+        }
+ ####################################################################3
+
+#####################################################################       
