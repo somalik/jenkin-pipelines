@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Directory and file paths
+source_dir="/wso2-stg-aksa/wso2mi-server/carbonapps/"
+backup_dir="/data/backup/Service_Product/"
+file_prefix="Service_Product-"
+file_suffix=".car"
+backup_file_prefix="Service_Product_bkp_"
+
+# Find the actual filename matching the pattern
+file_name=$(find "${source_dir}" -type f -name "${file_prefix}*.car" -print -quit)
+
+if [ -z "$file_name" ]; then
+    echo "Error: File '${file_prefix}*.car' not found in '${source_dir}'"
+    exit 1
+fi
+
+# Extract timestamp
+timestamp=$(date +"%Y%m%d_%H%M%S")
+
+# Create tar archive with gzip compression
+[root@master-server-01 ~]#
+ame}")"
+# Check if backup was successful
+if [ $? -eq 0 ]; then
+    echo "Backup successful: ${backup_file_prefix}${timestamp}.tar.gz"
+else
+    echo "Backup failed"
+fi
