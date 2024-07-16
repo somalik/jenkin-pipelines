@@ -86,5 +86,37 @@ Maven build Micro Integrator    //   to build car file with maven for MI WSO2
               }
         }
  ####################################################################3
+move artifact to the remote server
 
+ssh publish plugin needed (and configure server IP username password and remote directory)
 #####################################################################       
+         stage("Move to App Server"){
+         steps{
+             dir("/var/lib/jenkins/workspace/LMS-WSO2/Product_Service/Service_Product/Service_ProductCompositeExporter/target") {
+                script{
+               sshPublisher(
+                   continueOnError: false, failOnError: true,
+                     publishers: [
+                        sshPublisherDesc(
+                            configName: 'lms-wso2-stg', 
+                            transfers: [
+                            sshTransfer(cleanRemote: true,
+                            excludes: '',
+                            execCommand: 'pwd',
+                            execTimeout: 120000,
+                            flatten: false,
+                            makeEmptyDirs: false,
+                            noDefaultExcludes: false,
+                            patternSeparator: '[, ]+',
+                            remoteDirectory: 'Service_Product/',
+                            remoteDirectorySDF: false,
+                            removePrefix: '',
+                            sourceFiles: "${APP_NAME}-${BUILD_TAG}.car")],
+                        //    sourceFiles: '*')],
+                            usePromotionTimestamp: false,
+                            useWorkspaceInPromotion: false,
+                            verbose: true)]) 
+                   }
+                }
+            }
+         } 
