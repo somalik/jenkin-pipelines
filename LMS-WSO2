@@ -1,0 +1,148 @@
+pipeline {
+    agent {
+        label 'linux-mvn'
+    }
+    environment {
+
+        APP_NAME = 'Service_Product'
+        DEV_SERVER = '172.16.1.13'
+    }
+    stages {
+           stage('Select Branch') {
+            steps {
+                script {
+                    // Define the branches available for selection
+                    def branches = ['develop', 'Feature/SerilogDB', 'main']  // Update this list with actual branches
+                    
+                    // Ask the user to select a branch
+                    env.G_BRANCH = input(
+                        id: 'userInput', 
+                        message: 'Select the branch you want to build', 
+                        parameters: [choice(name: 'BRANCH', choices: branches.join('\n'), description: 'Choose a branch to proceed')]
+                    )
+                    
+                    echo "Selected branch: ${env.G_BRANCH}"
+                }
+            }
+        }
+        stage('Checkout Source') {
+       steps{
+         
+           sh 'rm -rf *'
+           sh 'sleep 2'
+          git branch: "${env.G_BRANCH}", credentialsId: 'aksasohail', url: 'http://10.0.0.232:8080/tfs/TFSCollection/LMS_WSO2/_git/LMS_WSO2_ProductService'
+    //    sh 'git config --global --add safe.directory /var/lib/jenkins/workspace/PTML-ONIC/IdentityServer'      
+                script {
+                 env.GIT_HASH = sh(
+                     script: "git rev-parse --short HEAD",
+                     returnStdout: true
+                     ).trim()
+                 env.GIT_BRANCH = sh (
+                     script: "git rev-parse --abbrev-ref HEAD",
+                     returnStdout: true
+                     ).trim()
+
+                   env.APP_VER = "13.0"
+           //      env.APP_VER = sh (
+        //             script: " grep -m1 -oP '(?<=<AssemblyVersion>).*(?=<\\/AssemblyVersion>)' ${env.APP_NAME}.csproj",
+          //           returnStdout: true
+        //             ).trim()
+                     echo "$APP_VER"
+    
+     //           echo "${APP_VER}-${GIT_BRANCH}-${BUILD_NUMBER}-${GIT_HASH} "
+                
+                    // Combine all into a build tag
+    env.BUILD_TAG = "${env.APP_VER}-stg-${env.BUILD_NUMBER}-${env.GIT_HASH}"
+    
+    // Print the build tag
+    echo "Build tag: ${env.BUILD_TAG}"
+             
+                }
+
+                }
+
+        }
+         stage('Build WAR') {
+            steps {
+                script {
+                    sh '''
+                    pwd
+                    cd Service_Product/
+                    mvn clean install -DskipTests
+                    '''
+                    sh '''
+                    pwd
+                    cd Service_Product/Service_ProductCompositeExporter/target
+                    mv Service_ProductCompositeExporter_1.0.0-SNAPSHOT.car ${APP_NAME}-${BUILD_TAG}.car
+                    '''
+                }
+                
+            }
+        }
+         stage("Move to App Server"){
+         steps{
+             dir("/var/lib/jenkins/workspace/LMS-WSO2/Product_Service/Service_Product/Service_ProductCompositeExporter/target") {
+                script{
+               sshPublisher(
+                   continueOnError: false, failOnError: true,
+                     publishers: [
+                        sshPublisherDesc(
+                            configName: 'lms-wso2-stg', 
+                            transfers: [
+                            sshTransfer(cleanRemote: false,
+                            excludes: '',
+                            execCommand: 'pwd',
+                            execTimeout: 120000,
+                            flatten: false,
+                            makeEmptyDirs: false,
+                            noDefaultExcludes: false,
+                            patternSeparator: '[, ]+',
+                            remoteDirectory: 'Service_Product/',
+                            remoteDirectorySDF: false,
+                            removePrefix: '',
+                            sourceFiles: "${APP_NAME}-${BUILD_TAG}.car")],
+                        //    sourceFiles: '*')],
+                            usePromotionTimestamp: false,
+                            useWorkspaceInPromotion: false,
+                            verbose: true)]) 
+                   }
+                }
+            }
+         } 
+stage('Deploy Artifact') {
+    steps {
+        script {
+            withCredentials([usernamePassword(credentialsId: 'aksasohail', passwordVariable: 'passwd', usernameVariable: 'reponame')]) {
+                
+                sh "sshpass -p '${passwd}' ssh -o StrictHostKeyChecking=no root@$DEV_SERVER 'sudo ./$APP_NAME-bkpup1.sh'"
+                sh "sshpass -p '${passwd}' ssh -o StrictHostKeyChecking=no root@$DEV_SERVER 'rm -rf /wso2-stg-aksa/wso2mi-server/carbonapps/${APP_NAME}*.car'"
+                sh "sleep 10"
+                sh "sshpass -p '${passwd}' ssh -o StrictHostKeyChecking=no root@$DEV_SERVER 'sudo mv /data/application/${APP_NAME}/${APP_NAME}-${BUILD_TAG}.car /wso2-stg-aksa/wso2mi-server/carbonapps/'"
+                sh "sshpass -p '${passwd}' ssh -o StrictHostKeyChecking=no root@$DEV_SERVER 'chmod 777 /wso2-stg-aksa/wso2mi-server/carbonapps/${APP_NAME}-*.car'"
+    
+                
+            }
+        }
+    }
+}
+        stage('Await Approval') {
+            steps {
+                script {
+                    def userInput = input(id: 'userInput', message: 'Do you approve this deployment?', parameters: [choice(name: 'CONFIRM', choices: ['yes', 'no'], description: 'Confirm Deployment')])
+                    if (userInput == 'no') {
+                        echo 'Rolling back to previous deployment...'
+                        // Add your restore commands here
+               withCredentials([usernamePassword(credentialsId: 'aksasohail', passwordVariable: 'passwd', usernameVariable: 'reponame')]) {
+                        sh "sshpass -p '$passwd' ssh -o StrictHostKeyChecking=no root@$DEV_SERVER 'rm -rf /wso2-stg-aksa/wso2mi-server/carbonapps/${APP_NAME}*.car' "
+                        sh "sleep 10"
+                        sh "sshpass -p '$passwd' ssh -o StrictHostKeyChecking=no root@$DEV_SERVER 'sudo ./$APP_NAME-restore.sh'"
+                               }
+                    } else {
+                        echo 'Deployment approved...'
+                    }
+                }
+            }
+        }
+
+    }
+}
