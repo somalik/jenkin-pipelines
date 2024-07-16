@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Backup directory
+APP_NAME="Service_Product"
+BACKUP_DIR="/data/backup/$APP_NAME/"
+
+# Find the latest backup file
+LATEST_BACKUP=$(ls -t ${BACKUP_DIR}${APP_NAME}_bkp_*.tar.gz | head -1)
+
+# Target directory for restoration
+TARGET_DIR="/wso2-stg-aksa/wso2mi-server/carbonapps/"
+
+# Ensure the target directory is clean or prepared
+#rm -rf $TARGET_DIR/*
+##mkdir -p $TARGET_DIR
+
+# Unpack the latest backup
+#mv $LATEST_BACKUP  $TARGET_DIR
+tar -xzf $LATEST_BACKUP -C $TARGET_DIR
+echo "Restored from backup: $LATEST_BACKUP"
