@@ -1,0 +1,85 @@
+pipeline {
+    agent any
+
+    environment {
+        MAVEN_HOME = tool 'Maven' // Ensure Maven is set up in Jenkins
+        TOMCAT_DIR = '/path/to/tomcat/webapps'
+        WAR_FILE = 'your-app.war'
+        OLD_WAR_FILE = 'your-app-old.war'
+        BACKUP_DIR = '/path/to/backup'
+        DEPLOY_URL = 'http://your-tomcat-server:port/your-app'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    // Step 1: Build the Maven project
+                    sh "${MAVEN_HOME}/bin/mvn clean package"
+                }
+            }
+        }
+
+        stage('Backup Old WAR') {
+            steps {
+                script {
+                    // Step 2: Backup the old WAR file
+                    if (fileExists("${TOMCAT_DIR}/${WAR_FILE}")) {
+                        sh "cp ${TOMCAT_DIR}/${WAR_FILE} ${BACKUP_DIR}/${OLD_WAR_FILE}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy New WAR') {
+            steps {
+                script {
+                    // Step 3: Deploy the new WAR file to Tomcat
+                    sh "cp target/${WAR_FILE} ${TOMCAT_DIR}/"
+                }
+            }
+        }
+
+        stage('Wait for Deployment') {
+            steps {
+                script {
+                    // Step 4: Wait for Tomcat to deploy the new WAR file
+                    sleep(time: 30, unit: 'SECONDS') // Adjust the sleep time as needed
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                script {
+                    // Step 5: Check the application health
+                    def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' ${DEPLOY_URL}", returnStdout: true).trim()
+                    def body = sh(script: "curl -s ${DEPLOY_URL}", returnStdout: true).trim()
+
+                    if (response == '200' && body.contains('pong')) {
+                        echo "Deployment successful: ${body}"
+                    } else {
+                        error "Deployment failed: HTTP response code ${response}. Rolling back."
+                    }
+                }
+            }
+        }
+
+        stage('Rollback') {
+            steps {
+                script {
+                    // Step 6: Rollback to the old WAR file
+                    sh "cp ${BACKUP_DIR}/${OLD_WAR_FILE} ${TOMCAT_DIR}/"
+                    echo "Rolled back to the previous version."
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Cleanup logic if needed
+            echo "Pipeline completed."
+        }
+    }
+}
