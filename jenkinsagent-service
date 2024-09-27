@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Create directory for Jenkins service
+sudo mkdir -p /usr/local/jenkins-service
+
+# Change ownership to the 'ubuntu' user
+sudo chown ubuntu /usr/local/jenkins-service
+
+# Navigate to the Jenkins service directory
+cd /usr/local/jenkins-service
+
+# Create start-agent.sh script
+cat << 'EOF' | sudo tee start-agent.sh > /dev/null
+#!/bin/bash
+cd /usr/local/jenkins-service
+# Just in case we would have upgraded the controller, we need to make sure that the agent is using the latest version of the agent.jar
+curl -sO http://10.0.0.40:8080/jnlpJars/agent.jar
+/usr/lib/jvm/java-11-openjdk-amd64/bin/java -jar agent.jar -jnlpUrl http://10.0.0.40:8080/computer/docker/jenkins-agent.jnlp -secret 89489f0265b9783fcb1efebb91af304c66a4fb3be1e4efa36b618e2008bb4849 -workDir "/var/lib/jenkins"
+exit 0
+EOF
+
+# Make the start-agent.sh script executable
+sudo chmod +x start-agent.sh
+
+# Create jenkins-agent.service file for systemd
+cat << 'EOF' | sudo tee /etc/systemd/system/jenkins-agent.service > /dev/null
+[Unit]
+Description=Jenkins MVN Agent
+
+[Service]
+User=ubuntu
+WorkingDirectory=/usr/local/jenkins-service
+ExecStart=/bin/bash /usr/local/jenkins-service/start-agent.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start the Jenkins agent service
+sudo systemctl enable --now jenkins-agent
+
+echo "Jenkins agent service has been installed and started successfully."
