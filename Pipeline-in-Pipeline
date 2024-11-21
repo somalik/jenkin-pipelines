@@ -1,0 +1,68 @@
+pipeline {
+    agent any
+    environment {
+        GIT_TAG = sh(
+            script: "git describe --tags --exact-match || echo ''", 
+            returnStdout: true
+        ).trim()
+    }
+    stages {
+        stage('Determine Pipeline') {
+            steps {
+                script {
+                    def targetPipeline = ''
+                    def customValue = 'Important Data' // Example of a custom variable
+
+                    if (GIT_TAG.contains('QAA')) {
+                        echo "Triggering Pipeline 001 (Tag: QAA)"
+                        targetPipeline = 'pipeline-001'
+                    } else if (GIT_TAG.contains('QSS')) {
+                        echo "Triggering Pipeline 002 (Tag: QSS)"
+                        targetPipeline = 'pipeline-002'
+                    } else if (GIT_TAG.contains('QTT')) {
+                        echo "Triggering Pipeline 003 (Tag: QTT)"
+                        targetPipeline = 'pipeline-003'
+                    } else if (GIT_TAG.contains('QGG')) {
+                        echo "Triggering Pipeline 004 (Tag: QGG)"
+                        targetPipeline = 'pipeline-004'
+                    } else {
+                        error "No matching tag found, exiting pipeline."
+                    }
+
+
+                    // Trigger the target pipeline and pass variables as parameters
+                    build job: targetPipeline, 
+                        parameters: [
+                            string(name: 'CUSTOM_VARIABLE', value: customValue),
+                            string(name: 'GIT_TAG', value: GIT_TAG)
+                        ]
+                }
+            }
+        }
+    }
+}
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+pipeline {
+    agent any
+    parameters {
+        string(name: 'G_BRANCH', defaultValue: '', description: 'Branch name passed from the main pipeline')
+        string(name: 'BUILD_TAG', defaultValue: '', description: 'Build tag passed from the main pipeline')
+    }
+    stages {
+        stage('Hello') {
+            steps {
+                echo 'Hello, World!'
+                echo "G_BRANCH: ${params.G_BRANCH}"
+                echo "BUILD_TAG: ${params.BUILD_TAG}"
+            }
+        }
+    }
+}
