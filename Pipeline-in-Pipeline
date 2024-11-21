@@ -1,30 +1,79 @@
 pipeline {
-    agent any
-    environment {
-        GIT_TAG = sh(
-            script: "git describe --tags --exact-match || echo ''", 
-            returnStdout: true
-        ).trim()
-    }
-    stages {
+    agent{ 
+        label 'dotnetcore'
+}
+ stages {
+    stage('Select Branch') {
+            steps {
+                script {
+                     sh 'pwd'
+                    // Define the branches available for selection
+                    def branches = ['AKSA-STG', 'UAT', 'PRD']  // Update this list with actual branches
+                    
+                    // Ask the user to select a branch
+                    env.G_BRANCH = input(
+                        id: 'userInput', 
+                        message: 'Select the branch you want to build', 
+                        parameters: [choice(name: 'BRANCH', choices: branches.join('\n'), description: 'Choose a branch to proceed')]
+                    )
+                    
+                    echo "Selected branch: ${env.G_BRANCH}"
+                }
+            }
+        }
+         stage('Checkout1') {
+            steps {
+               git branch: "${env.G_BRANCH}", credentialsId: 'aksasohail', url: 'http://10.0.0.232:8080/tfs/TFSCollection/_git/JazzQRv2'
+      
+                                script {
+
+ 
+      //           env.tag_name = sh (
+      //               script: 'git describe --tags --abbrev=0', returnStdout: true
+      //               ).trim()
+                 env.tag_name = 'QAA'
+        
+                 echo "$tag_name"
+    
+                }
+            }
+        post {
+                success {
+                    slackSend channel: '#test', color: '#63C1A0', message: " Jazz_QR ENV Build In Progress : $tag_name "
+                }
+                failure {
+                    slackSend channel: '#test', color: '#ECB32D', message: "Jazz_QR ENV Build failed : $tag_name "
+                }
+              }
+        }
         stage('Determine Pipeline') {
             steps {
                 script {
                     def targetPipeline = ''
                     def customValue = 'Important Data' // Example of a custom variable
 
-                    if (GIT_TAG.contains('QAA')) {
-                        echo "Triggering Pipeline 001 (Tag: QAA)"
-                        targetPipeline = 'pipeline-001'
-                    } else if (GIT_TAG.contains('QSS')) {
-                        echo "Triggering Pipeline 002 (Tag: QSS)"
-                        targetPipeline = 'pipeline-002'
-                    } else if (GIT_TAG.contains('QTT')) {
-                        echo "Triggering Pipeline 003 (Tag: QTT)"
-                        targetPipeline = 'pipeline-003'
-                    } else if (GIT_TAG.contains('QGG')) {
-                        echo "Triggering Pipeline 004 (Tag: QGG)"
-                        targetPipeline = 'pipeline-004'
+                    if (tag_name.contains('QJA')) {
+                        echo "Triggering Pipeline JazzQR_API (Tag: QJA)"
+                        targetPipeline = 'JazzQR_API'
+                    } else if (tag_name.contains('QJP')) {
+                        echo "Triggering Pipeline JazzQR_Portal (Tag: QJP)"
+                        targetPipeline = 'JazzQR_Portal'
+                    } else if (tag_name.contains('QAA')) {
+                        echo "Triggering Pipeline ApanelAPI (Tag: QAA)"
+                        targetPipeline = 'Jazz_QR_DEV'
+                    } else if (tag_name.contains('QAU')) {
+                        echo "Triggering Pipeline ApanelUI (Tag: QAU)"
+                        targetPipeline = 'ApanelUI'
+                    } else if (tag_name.contains('QSE')) {
+                        echo "Triggering Pipeline Service_External (Tag: QSE)"
+                        targetPipeline = 'Service_External'
+                    } else if (tag_name.contains('QSM')) {
+                        echo "Triggering Pipeline Service_MobileAPI (Tag: QSM)"
+                        targetPipeline = 'Service_MobileAPI'
+                    } else if (tag_name.contains('QSQ')) {
+                        echo "Triggering Pipeline Service_MobileAPI (Tag: QSQ)"
+                        targetPipeline = 'Service_MobileAPI'
+
                     } else {
                         error "No matching tag found, exiting pipeline."
                     }
@@ -33,17 +82,155 @@ pipeline {
                     // Trigger the target pipeline and pass variables as parameters
                     build job: targetPipeline, 
                         parameters: [
-                            string(name: 'CUSTOM_VARIABLE', value: customValue),
-                            string(name: 'GIT_TAG', value: GIT_TAG)
+                            //string(name: 'CUSTOM_VARIABLE', value: customValue),
+                            string(name: 'BUILD_TAG', value: BUILD_TAG),
+                            string(name: 'G_BRANCH', value: G_BRANCH)
                         ]
                 }
             }
         }
+
+
+  } 
+    post {
+        always {
+            cleanWs() // Clean workspace after the pipeline execution
+            echo 'Pipeline execution completed.'
+        }
+    }
+        }
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+pipeline {
+    agent{ 
+
+        label 'dotnetcore'
+
+
+}
+  parameters {
+        string(name: 'G_BRANCH', defaultValue: '', description: 'Branch name passed from the main pipeline')
+    }
+    environment {
+         DEV_SERVER= '10.0.0.42'
+         APP1= 'ApanelAPI'
+         APP2= 'Service_External'
+         APP3= 'Service_MobileAPI'
+         APP4= 'Service_Queue'
+         APP5= 'JazzQR_API'
+
+         dotnet= '/home/admin/dotnet/6.0/dotnet'
+         dotnet3= '/home/admin/dotnet/3.1/dotnet'
+        SMB_SHARE = '//172.16.1.219/deploy$' // Ensure the deploy$ share exists
+        TARGET_DIR = 'C:\\inetpub\\wwwroot\\LMS-Api'
+        SOURCE_DIR = 'd:\\deploy'
+        ZIP_FILE = '${APP1}-${IMAGE_TAG1}-${BUILD_TAG}.zip' // Adjust as necessary
+
+      }
+                
+    
+    stages {
+         stage('Checkout1') {
+            steps {
+               git branch: "${params.G_BRANCH}", credentialsId: 'aksasohail', url: 'http://10.0.0.232:8080/tfs/TFSCollection/_git/JazzQRv2'
+      
+                                script {
+                 env.GIT_HASH = sh(
+                     script: "git rev-parse --short HEAD",
+                     returnStdout: true
+                     ).trim()
+                 env.GIT_BRANCH = sh (
+                     script: "git rev-parse --abbrev-ref HEAD",
+                     returnStdout: true
+                     ).trim()
+ 
+      //           env.tag_name = sh (
+      //               script: 'git describe --tags --abbrev=0', returnStdout: true
+      //               ).trim()
+                 env.tag_name = 'QAA'
+        
+                 echo "$tag_name"
+
+                   sh 'pwd'
+                 env.BUILD_TAG = "${GIT_BRANCH}-${env.BUILD_NUMBER}-${env.GIT_HASH}"
+    
+    // Print the build tag
+    echo "Build tag: ${env.BUILD_TAG}"     
+                }
+            }
+        post {
+                success {
+                    slackSend channel: '#test', color: '#63C1A0', message: " Jazz_QR ENV ${GIT_BRANCH} Build In Progress : $tag_name "
+                }
+                failure {
+                    slackSend channel: '#test', color: '#ECB32D', message: "Jazz_QR ENV ${GIT_BRANCH} Build failed : $tag_name "
+                }
+              }
+        }
+
+            stage('Service_Product deploy ') {
+        when {
+        expression {tag_name.contains('QAA') }
+         }
+            steps {
+                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                script {
+               //   env.IMAGE_TAG1 = sh (
+               //      script: "cd ${APP1}/; grep -m1 -oP '(?<=<AssemblyVersion>).*(?=<\\/AssemblyVersion>)' ${APP1}.csproj",
+               //      returnStdout: true
+                //     ).trim()
+                    env.IMAGE_TAG1 = '1.0.0'
+                    sh '''
+                    cd ${APP1}/
+                     $dotnet restore $APP1.csproj
+                     mkdir -p publish && chmod 777 -R publish
+                     $dotnet publish $APP1.csproj -c Release -r linux-x64 -o publish/$APP1/
+                     cd publish/$APP1
+                     zip -r ../${APP1}-${IMAGE_TAG1}-${BUILD_TAG}.zip ./*
+                     '''
+        withCredentials([usernamePassword(credentialsId: 'aksasohail', passwordVariable: 'smb_pass', usernameVariable: 'smb_user')]) {
+// SCP-like SMB command to transfer the zip file to the Windows server
+            sh """
+            pwd
+            ls
+                cd ${APP1}/publish/
+                        pwd
+            ls
+                smbclient //172.16.1.219/deploy\$ -U sohail@aksa.com.pk%${smb_pass} -c 'put ${APP1}-${IMAGE_TAG1}-${BUILD_TAG}.zip'
+
+            """
+                     }
+                }
+            }
+        }
+            }
+stage('Windows') {
+    agent { label 'win-agent' } // Specify that this stage runs on a Windows agent
+    environment {
+        DEPLOY_BAT_PATH = 'D:\\scripts\\deploy.bat' // Set the path to deploy.bat
+    }
+    steps {
+        script {
+            withCredentials([usernamePassword(credentialsId: 'aksasohail', 
+                                              passwordVariable: 'SMB_PASS', 
+                                              usernameVariable: 'SMB_USER')]) {
+                // Step 1: Using PsExec to delete the LMS-api folder on the remote Windows server
+                bat """
+                cd /d C:\\data\\jenkins\\workspace
+                PsExec.exe \\\\172.16.1.219 -u ${SMB_USER} -p ${SMB_PASS} -i -s cmd /c "${DEPLOY_BAT_PATH}"
+                """
+            }
+        }
     }
 }
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
+    } 
+    post {
+        always {
+            cleanWs() // Clean workspace after the pipeline execution
+            echo 'Pipeline execution completed.'
+        }
+    }
+        }
 
 
 
