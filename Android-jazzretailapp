@@ -1,0 +1,124 @@
+pipeline {
+        agent {
+        
+        docker {
+            label 'docker'
+            image 'somalik/android-jdk21-sdk24:v6' // Use Docker image with Java 8 and Ant
+            args '-v /data/application:/data/application --user root'    // Optional: Mount Maven repository if needed
+        }
+    }
+    environment {
+        APP = "jazz-retail-app"
+        GRADLE_FILE = "app/build.gradle.kts"
+        
+        NEXUS_CREDENTIALS = credentials('Android-projects') // Add your Nexus credentials in Jenkins
+    
+        
+    }
+
+
+    stages {
+stage('Checkout') {
+    steps {
+        // Checkout code from your SCM (TFS)
+        git branch: 'development', credentialsId: 'aksasohail', url: 'http://10.0.0.232:8080/tfs/TFSCollection/JazzRetailerAppAndroid/_git/JazzRetailerApp'
+
+        // Add safe directory for git operations
+        sh "git config --global --add safe.directory /var/lib/jenkins/workspace/Android-Projects/Jazz/JazzRetailerRevamp-Project/JazzRetailerRevamp-Dev"
+
+        script {
+            // Get the current git hash
+            env.GIT_HASH = sh(
+                script: "git rev-parse --short HEAD",
+                returnStdout: true
+            ).trim()
+            
+            // Get the current branch name
+            env.GIT_BRANCH = sh(
+                script: "git rev-parse --abbrev-ref HEAD",
+                returnStdout: true
+            ).trim()
+
+            // Extract versionCode and versionName from app/build.gradle.kts
+            def versionCode = sh(
+                script: "grep -E 'versionCode' app/build.gradle.kts | awk -F'=' '{print \$2}' | xargs",
+                returnStdout: true
+            ).trim()
+            def versionName = sh(
+                script: "grep -E 'versionName' app/build.gradle.kts | awk -F'=' '{print \$2}' | sed 's/\\\"//g' | xargs",
+                returnStdout: true
+            ).trim()
+
+            // Combine into app_ver
+            env.APP_VER = "${versionCode}-${versionName}"
+            echo "Extracted app_ver: ${env.APP_VER}"
+
+            // Combine details for tagging or versioning
+            echo "${APP}:${env.APP_VER}-${env.GIT_BRANCH}-${BUILD_NUMBER}-${env.GIT_HASH}"
+        }
+    }
+}
+        
+stage('Build') {
+    steps {
+        script {
+            // Build the Java project using Gradle and prepare APK
+            sh '''
+                # Set Android SDK path
+                export ANDROID_HOME=/home/Android/Sdk
+                
+                # Grant permissions to all files in the workspace
+                chmod -R 777 *
+                
+                # Build the project in release mode
+                ./gradlew assembleRelease
+                
+                # Navigate to the release APK output directory
+                cd app/build/outputs/apk/release/
+                
+                # Copy the generated APK to a specific location with a dynamic name
+                cp app-release.apk /data/application/${APP}:${APP_VER}-${GIT_BRANCH}-${BUILD_NUMBER}-${GIT_HASH}.apk
+            '''
+        }
+    }
+}
+stage('Upload') {
+    steps {
+        script {
+            // Upload the APK to Nexus repository
+            withCredentials([usernamePassword(credentialsId: 'Android-projects', passwordVariable: 'apkpass', usernameVariable: 'apkuser')]) {
+            sh '''
+            cd /data/application/
+                # Define APK file path and Nexus repository URL
+                APK_FILE="${APP}:${APP_VER}-${GIT_BRANCH}-${BUILD_NUMBER}-${GIT_HASH}.apk"
+                NEXUS_URL="https://nexus3.aksa.com.pk:8443/repository/JazzRetailerRevamp-Dev"
+                 
+                # Check if the APK file exists
+                if [ -f "$APK_FILE" ]; then
+                    echo "Uploading $APK_FILE to $NEXUS_URL"
+
+                    # Use Nexus credentials to upload the file
+                    curl -u $apkuser:$apkpass \
+                         -k \
+                         -X PUT \
+                         -H "Content-Type: application/vnd.android.package-archive" \
+                         --upload-file "$APK_FILE" \
+                         "$NEXUS_URL/$APK_FILE"
+                else
+                    echo "Error: $APK_FILE not found!"
+                    exit 1
+                fi
+            '''
+        }
+    }
+}
+}
+    }
+
+    post {
+        always {
+            // Clean up the workspace after the build
+            cleanWs()
+        }
+    }
+}
